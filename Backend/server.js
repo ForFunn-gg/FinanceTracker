@@ -20,17 +20,41 @@ const app = express();
 
 connectDB();
 
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:3000',
+  process.env.CLIENT_URL,           
+].filter(Boolean);                
+
 app.use(cors({
-  origin:      process.env.CLIENT_URL || 'http://localhost:5173',
+  origin: function (origin, callback) {
+    if (!origin) return callback(null, true);
+
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    console.error('CORS blocked origin:', origin);
+    return callback(new Error('Not allowed by CORS'));
+  },
   credentials: true,
+  methods:     ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
 }));
+
+app.options('*', cors());
+
 app.use(express.json({ limit: '10kb' }));
 
 app.use('/api/auth',         authRoutes);
 app.use('/api/transactions', transactionRoutes);
 
 app.get('/api/health', (_req, res) =>
-  res.json({ status: 'ok', timestamp: new Date().toISOString() })
+  res.json({
+    status:  'ok',
+    timestamp: new Date().toISOString(),
+    env:     process.env.NODE_ENV || 'development',
+  })
 );
 
 app.use((req, res) =>
@@ -47,5 +71,6 @@ app.use((err, _req, res, _next) => {
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`\n✅ Server running on port ${PORT}`);
+  console.log(`   Allowed origins: ${allowedOrigins.join(', ')}`);
   console.log(`   Health: http://localhost:${PORT}/api/health\n`);
 });
